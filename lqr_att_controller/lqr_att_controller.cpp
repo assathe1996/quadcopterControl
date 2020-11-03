@@ -110,6 +110,24 @@ void LQRattControl::read_K() {
 		PX4_ERR("K.txt not opened");
 }
 
+void LQRattControl::write_state(Matrix <float, 12, 1> state) {
+	const unsigned SIZE = 12;
+	hrt_abstime now = hrt_absolute_time();
+
+	static std::ofstream outfile;
+	static std::string current_path = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/state.txt";
+	outfile.open(current_path, std::ios::out | std::ios::app);
+
+	outfile << now << "\t";
+	for (unsigned count = 0; count < SIZE; count++) {
+		if (count == 11)
+			outfile << state(count, 0) << "\n";
+		else
+			outfile << state(count, 0) << "\t";
+	}
+	outfile.close();
+}
+
 void LQRattControl::compute() {
 	static Matrix<float, 12, 1> delta_x;
 
@@ -118,15 +136,13 @@ void LQRattControl::compute() {
 }
 
 void LQRattControl::normalize() {
-	_u_control(1,0) = fmin(fmax((_u_control(1,0))/(0.1080f*4.0f), -1.0f), 1.0f);  
-    _u_control(2,0) = fmin(fmax((_u_control(2,0))/(0.1080f*4.0f),  -1.0f), 1.0f);
-    _u_control(3,0) = fmin(fmax((_u_control(3,0))/(0.1f*1.0f), -1.0f), 1.0f);
-    _u_control(0,0) = fmin(fmax((_u_control(0,0)+5.886f)/16.0f, 0.0f), 1.0f);
+    _u_control(1,0) = fmin(fmax((_u_control(1,0)), -1.0f), 1.0f);  
+    _u_control(2,0) = fmin(fmax((_u_control(2,0)),  -1.0f), 1.0f);
+    _u_control(3,0) = fmin(fmax((_u_control(3,0)), -1.0f), 1.0f);
+    _u_control(0,0) = fmin(fmax((_u_control(0,0)), 0.0f), 1.0f) + 0.20f;
 }
 
 void LQRattControl::display() {
-	//PX4_INFO("%f %f %f %f", double(_u_control(0, 0)), double(_u_control(1, 0)),
-	//	double(_u_control(2, 0)), double(_u_control(3, 0)));
 	if (show_height == true) {
 		PX4_INFO("Current height: %f", double(_vehicle_pos.z));
 		show_height = false;
@@ -217,6 +233,9 @@ void LQRattControl::Run() {
 
 	set_equilibrium_state();
 	_current_state = get_state();
+	if (height_setpoint != 0.0f)
+		//PX4_INFO("%f %f",double(hrt_absolute_time()), double(_current_state(5, 0)));
+		write_state(_current_state);
 
 	compute();
 	normalize();

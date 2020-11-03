@@ -72,6 +72,7 @@ private:
 	void set_equilibrium_state();
 	void set_firmware_dir();
 	void read_K();
+	void write_state(Matrix <float, 12, 1> state);
 
 	void compute();
 	void normalize();
