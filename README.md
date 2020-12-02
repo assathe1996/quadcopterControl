@@ -8,4 +8,11 @@
 
 ## Usage
 1. lqr_att_controller
+- Arm the vehicle using command: 'commander arm'.
+- Land the vehicle using command: 'commander land'.
+- Start the controller using command: 'lqr_att_controller start'.
+- Stop the controller using command: 'lqr_att_controller stop'.
+- Set height for the controller using command: 'lqr_att_controller set_height <value>'.  Note: the value should be negative as UP direction is negative in the simulator.
+ -Display current height using command: 'lqr_att_controller show_height'.
+- Usage instructions will be visible by typing ‘lqr_att_controller’ in the command prompt.
 2. observer
