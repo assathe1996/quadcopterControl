@@ -2,6 +2,10 @@
 
 static bool show_height;
 static float height_setpoint;
+static float x_setpoint;
+static float y_setpoint;
+static float yaw_setpoint;
+//static bool height_entered = false;
 
 LQRattControl::LQRattControl() :
 	ModuleParams(nullptr),
@@ -12,7 +16,10 @@ LQRattControl::LQRattControl() :
 		read_K();
 
 		show_height = false;
+		x_setpoint = _equilibrium_state(1, 0);
+		y_setpoint = _equilibrium_state(3, 0);
 		height_setpoint = _equilibrium_state(5, 0);
+		yaw_setpoint = _equilibrium_state(11, 0);
 		memset(&_actuators, 0, sizeof(_actuators));
 }
 
@@ -81,6 +88,9 @@ Matrix<float, 12, 1> LQRattControl::get_state() {
 
 void LQRattControl::set_equilibrium_state() {
 	_equilibrium_state(5, 0) = height_setpoint;
+	_equilibrium_state(1, 0) = x_setpoint;
+	_equilibrium_state(3, 0) = y_setpoint;
+	_equilibrium_state(11, 0) = yaw_setpoint;	
 }
 
 void LQRattControl::set_firmware_dir() {
@@ -144,10 +154,70 @@ void LQRattControl::normalize() {
 
 void LQRattControl::display() {
 	if (show_height == true) {
-		PX4_INFO("Current height: %f", double(_vehicle_pos.z));
+
+		poll_vechicle_local_position();
+		poll_vehicle_attitide();
+		poll_vehicle_angular_velocity();
+
+		PX4_INFO("height: %f x: %f y: %f yaw: %f", double(_vehicle_pos.z), double(_vehicle_pos.x), double(_vehicle_pos.y), double(Eulerf(Quatf(_vehicle_attitude.q)).psi()));
 		show_height = false;
 	}
 
+}
+
+Matrix<float, 12, 1> LQRattControl::complementary_filter() {
+	poll_sensor_combined();
+	poll_sensor_mag();
+
+	poll_vechicle_local_position();
+
+	const float gyro_weight = 0.98f;
+	const float accel_weight = 0.02f;
+
+	static Matrix<float, 12, 1> estimated_state;
+	const float us_to_s = 0.000001;
+	float time_diff_gyro = _sensor_combined.gyro_integral_dt * us_to_s;
+
+	estimated_state(0, 0) = _vehicle_pos.vx;
+	estimated_state(1, 0) = _vehicle_pos.x;
+	estimated_state(2, 0) = _vehicle_pos.vy;
+	estimated_state(3, 0) = _vehicle_pos.y;
+	estimated_state(4, 0) = _vehicle_pos.vz;
+	estimated_state(5, 0) = _vehicle_pos.z;
+	
+	float roll_from_acc =  atan2(_sensor_combined.accelerometer_m_s2[1], sqrt(pow(_sensor_combined.accelerometer_m_s2[0], 2) + pow(_sensor_combined.accelerometer_m_s2[2], 2)));
+	float pitch_from_acc = atan2(-_sensor_combined.accelerometer_m_s2[0], sqrt(pow(_sensor_combined.accelerometer_m_s2[1], 2) + pow(_sensor_combined.accelerometer_m_s2[2], 2)));
+	
+	float mag_length = sqrt(pow(_sensor_mag.x, 2) + pow(_sensor_mag.y, 2) + pow(_sensor_mag.z, 2));
+	float mag_x = _sensor_mag.x / mag_length;
+	float mag_y = _sensor_mag.y / mag_length;
+	float mag_z = _sensor_mag.z / mag_length;
+
+	estimated_state(6, 0) = _sensor_combined.gyro_rad[0];
+	estimated_state(7, 0) = gyro_weight * (estimated_state(7, 0) + estimated_state(6, 0) * time_diff_gyro) + accel_weight * roll_from_acc; 
+	estimated_state(8, 0) = _sensor_combined.gyro_rad[1];
+	estimated_state(9, 0) = gyro_weight * (estimated_state(9, 0) + estimated_state(8, 0) * time_diff_gyro) + accel_weight * pitch_from_acc;
+
+	float numerator = sin(estimated_state(7, 0))*mag_z - cos(estimated_state(7, 0))*mag_y;
+	float denominator = cos(estimated_state(9, 0))*mag_x + sin(estimated_state(7, 0))*sin(estimated_state(9, 0))*mag_y + cos(estimated_state(9, 0))*sin(estimated_state(7, 0))*mag_z;
+	float yaw_from_mag = atan2(numerator, denominator);
+
+	estimated_state(10, 0) = _sensor_combined.gyro_rad[2];
+	estimated_state(11, 0) = gyro_weight * (estimated_state(11, 0) + estimated_state(10, 0) * time_diff_gyro) + accel_weight * yaw_from_mag;
+	
+	return estimated_state;
+}
+
+void LQRattControl::poll_sensor_combined() {
+	_sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
+	orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensor_combined);
+	orb_unsubscribe(_sensor_combined_sub);
+}
+
+void LQRattControl::poll_sensor_mag() {
+	_sensor_mag_sub = orb_subscribe(ORB_ID(sensor_mag));
+	orb_copy(ORB_ID(sensor_mag), _sensor_mag_sub, &_sensor_mag);
+	orb_unsubscribe(_sensor_mag_sub);
 }
 
 // ModuleBase functions
@@ -178,7 +248,7 @@ int LQRattControl::custom_command(int argc, char *argv[]) {
 	static bool command_present = false;
 	
 	if (argc == 1) {
-		if (!strncmp(argv[0], "show_height", 11)) {
+		if (!strncmp(argv[0], "show_data", 9)) {
 			command_present = true;
 			show_height = true;
 		}
@@ -189,7 +259,34 @@ int LQRattControl::custom_command(int argc, char *argv[]) {
 			command_present = true;
 			static std::string::size_type sz;
 			height_setpoint = std::stof (argv[1], &sz); 
-			PX4_INFO("Setting height to: %lf", double(height_setpoint));
+			PX4_INFO("Setting height to: %f", double(height_setpoint));
+		}
+	}
+
+	if (argc == 2) {
+		if (!strncmp(argv[0], "set_x", 5)) {
+			command_present = true;
+			static std::string::size_type sz;
+			x_setpoint = std::stof (argv[1], &sz); 
+			PX4_INFO("Setting X to: %f", double(x_setpoint));
+		}
+	}
+
+	if (argc == 2) {
+		if (!strncmp(argv[0], "set_y", 5)) {
+			command_present = true;
+			static std::string::size_type sz;
+			y_setpoint = std::stof (argv[1], &sz); 
+			PX4_INFO("Setting Y to: %f", double(y_setpoint));
+		}
+	}
+
+	if (argc == 2) {
+		if (!strncmp(argv[0], "set_yaw", 7)) {
+			command_present = true;
+			static std::string::size_type sz;
+			yaw_setpoint = std::stof (argv[1], &sz); 
+			PX4_INFO("Setting yaw to: %f", double(yaw_setpoint));
 		}
 	}
 
@@ -232,10 +329,8 @@ void LQRattControl::Run() {
 	perf_begin(_loop_perf);
 
 	set_equilibrium_state();
-	_current_state = get_state();
-	if (height_setpoint != 0.0f)
-		//PX4_INFO("%f %f",double(hrt_absolute_time()), double(_current_state(5, 0)));
-		write_state(_current_state);
+	_current_state = complementary_filter();
+	//_current_state = get_state();
 
 	compute();
 	normalize();

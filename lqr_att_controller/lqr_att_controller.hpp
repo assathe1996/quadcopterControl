@@ -13,6 +13,9 @@
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
 
+#include <uORB/topics/sensor_combined.h>
+#include <uORB/topics/sensor_mag.h>
+
 #include <lib/perf/perf_counter.h>
 #include <drivers/drv_hrt.h>
 
@@ -20,6 +23,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <math.h>
 
 using namespace matrix;
 using namespace time_literals;
@@ -77,6 +81,17 @@ private:
 	void compute();
 	void normalize();
 	void display();
+
+
+	Matrix<float, 12, 1> complementary_filter();
+	void poll_sensor_combined();
+	void poll_sensor_mag();
+
+	int _sensor_combined_sub{-1};
+	int _sensor_mag_sub{-1};
+
+	struct sensor_combined_s            _sensor_combined {};
+	struct sensor_mag_s                 _sensor_mag {};
 
 
 };
