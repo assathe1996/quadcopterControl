@@ -37,12 +37,12 @@ ax = zeros(N,1);
 ay = zeros(N,1);
 az = zeros(N,1);
 
-acc_lpf_weight = .8;
-imu_lpf_weight = .8;
-mag_lpf_weight = .8;
-accel_weight = 0.0001;
+acc_lpf_weight = .95;
+imu_lpf_weight = .95;
+mag_lpf_weight = .95;
+accel_weight = 0.001;
 gyro_weight = 1-accel_weight;
-mag_weight = .01;
+mag_weight = .1;
 gyro_weight_heading = 1-mag_weight;
 
 for i = 2:N
