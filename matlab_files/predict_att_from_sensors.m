@@ -37,13 +37,17 @@ ax = zeros(N,1);
 ay = zeros(N,1);
 az = zeros(N,1);
 
-acc_lpf_weight = .95;
-imu_lpf_weight = .95;
-mag_lpf_weight = .95;
+% lpf weights - closer to 1 means more weight given to newest measurement
+acc_lpf_weight = .98;
+imu_lpf_weight = .98;
+mag_lpf_weight = .98;
+% complementary filter weights - closer to 1 means more weight given to
+% gyro data versus accelerometer/magnetometer
 accel_weight = 0.001;
 gyro_weight = 1-accel_weight;
-mag_weight = .1;
+mag_weight = .01;
 gyro_weight_heading = 1-mag_weight;
+cf_use_filtered_data = false;
 
 for i = 2:N
     % LPF the data where applicable
@@ -65,10 +69,18 @@ for i = 2:N
     roll_from_acc =  atan2(ay(i), sqrt(ax(i)^2 + az(i)^2));
     pitch_from_acc = atan2(-ax(i), sqrt(ay(i)^2 + az(i)^2));
     
-    cf_p = p_hat(i); % could also use imu_p(i) if you don't want filtered value
+    if cf_use_filtered_data
+        cf_p = p_hat(i); 
+    else
+        cf_p = imu_p(i);
+    end
     phi_hat(i) = gyro_weight*(phi_hat(i-1) + cf_p*dt) + accel_weight*roll_from_acc; 
     
-    cf_q = q_hat(i); % could also use imu_q(i) if you don't want filtered value
+    if cf_use_filtered_data
+        cf_q = q_hat(i); 
+    else
+        cf_q = imu_q(i);
+    end
     th_hat(i) = gyro_weight*(th_hat(i-1) + cf_q*dt) + accel_weight*pitch_from_acc;
     
     mag_len = sqrt(mx(i)^2 + my(i)^2 + mz(i)^2);
@@ -130,4 +142,13 @@ plot(t_true, (psi_true-psi_hat)*180/pi);
 ylabel('degrees º')
 grid on
 title('\psi error')
+
+% figure()
+% subplot(3,1,1)
+% plot(t_true, mag_x)
+% subplot(3,1,2)
+% plot(t_true, mag_y)
+% subplot(3,1,3)
+% plot(t_true, mag_z)
+
 
