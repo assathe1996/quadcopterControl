@@ -40,9 +40,9 @@ az = zeros(N,1);
 acc_lpf_weight = .8;
 imu_lpf_weight = .8;
 mag_lpf_weight = .8;
-accel_weight = 0.001;
+accel_weight = 0.0001;
 gyro_weight = 1-accel_weight;
-mag_weight = .05;
+mag_weight = .01;
 gyro_weight_heading = 1-mag_weight;
 
 for i = 2:N
@@ -60,8 +60,8 @@ for i = 2:N
     az(i) = (1-acc_lpf_weight)*az(i-1) + acc_lpf_weight*acc_z(i);
     
     % estimate using the complementary filters
-    dt = t_sensor(i) - t_sensor(i-1);
-    %dt = imu_dt(i);
+    %dt = t_sensor(i) - t_sensor(i-1);
+    dt = imu_dt(i);
     roll_from_acc =  atan2(ay(i), sqrt(ax(i)^2 + az(i)^2));
     pitch_from_acc = atan2(-ax(i), sqrt(ay(i)^2 + az(i)^2));
     
