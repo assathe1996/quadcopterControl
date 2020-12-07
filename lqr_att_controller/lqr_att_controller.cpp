@@ -15,7 +15,7 @@ LQRattControl::LQRattControl() :
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::test1),
 	_loop_perf(perf_alloc(PC_ELAPSED, "lqr_att_control")) {
 		set_firmware_dir();
-		_equilibrium_state = get_state();
+		_equilibrium_state = get_ekf_state();
 		read_K();
 		read_A_L_C();
 		read_B();
