@@ -1,14 +1,14 @@
 % Tim McNamara
 % 18-776 Project Part 1
 
-function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_velocity, plot_angle, plot_angvel, plot_input)
+function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_velocity, plot_angle, plot_angvel, plot_input, legend_labels)
     tmin = 0;
     tmax = max(t_true);
     if plot_pos
         figure()
         subplot(3,1,1)
         plot(t, x(:,2), t_true, x_true(:,2))
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('x position (m)')
@@ -18,7 +18,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
 
         subplot(3,1,2)
         plot(t, x(:,4), t_true, x_true(:,4))
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('y position (m)')
@@ -28,7 +28,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
 
         subplot(3,1,3)
         plot(t, x(:,6), t_true, x_true(:,6))
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('z position (m)')
@@ -42,7 +42,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
         figure()
         subplot(3,1,1)
         plot(t, x(:,1), t_true, x_true(:,1))
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('x velocity (m/s)')
@@ -51,7 +51,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
 
         subplot(3,1,2)
         plot(t, x(:,3), t_true, x_true(:,3))
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('y velocity (m/s)')
@@ -60,7 +60,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
 
         subplot(3,1,3)
         plot(t, x(:,5), t_true, x_true(:,5))
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('z velocity (m/s)')
@@ -73,7 +73,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
         figure()
         subplot(3,1,1)
         plot(t, x(:,8)*180/pi, t_true, x_true(:,8)*180/pi)
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('\phi (deg)')
@@ -83,7 +83,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
 
         subplot(3,1,2)
         plot(t, x(:,10)*180/pi, t_true, x_true(:,10)*180/pi)
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('\theta (deg)')
@@ -93,7 +93,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
 
         subplot(3,1,3)
         plot(t, x(:,12)*180/pi, t_true, x_true(:,12)*180/pi)
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('\psi (deg)')
@@ -107,7 +107,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
         figure(4)
         subplot(3,1,1)
         plot(t, x(:,7)*180/pi, t_true, x_true(:,7)*180/pi)
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('p (deg/s)')
@@ -117,7 +117,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
 
         subplot(3,1,2)
         plot(t, x(:,9)*180/pi, t_true, x_true(:,9)*180/pi)
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('q (deg/s)')
@@ -127,7 +127,7 @@ function plot_quadrotor_model(x,t, u, x_true, t_true, u_norm, plot_pos, plot_vel
 
         subplot(3,1,3)
         plot(t, x(:,11)*180/pi, t_true, x_true(:,11)*180/pi)
-        legend('State estimator', 'EKF');
+        legend(legend_labels(1), legend_labels(2));
         grid on
         xlabel('time (s)')
         ylabel('r (deg/s)')
