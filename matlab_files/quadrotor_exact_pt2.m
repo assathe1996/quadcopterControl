@@ -38,7 +38,7 @@ function dx_ext_dt = quadrotor_exact(t, x_ext, K, L, sensor_noise, A, B)
     
     y = zeros(12,1);
     for i = 1:12
-        y(i) = x(i) + sensor_noise(i)*rand(1);
+        y(i) = x(i) + normrnd(0,sensor_noise(i));
     end
     
     u = -K*x_hat;
@@ -74,19 +74,20 @@ function dx_ext_dt = quadrotor_exact(t, x_ext, K, L, sensor_noise, A, B)
              q*cos(phi) - r*sin(phi);
              1/Jz*tau_psi;
              q*sin(phi)/cos(theta) + r*cos(phi)/cos(theta)];
-       
-%     dx_hat_dt = [cos(phi_hat)*sin(theta_hat)*az;
-%                  px_dot_hat;
-%                  -sin(phi_hat)*az;
-%                  py_dot_hat;
-%                  g + cos(phi_hat)*cos(theta_hat)*az;
-%                  pz_dot_hat;
-%                  1/Jx*tau_phi;
-%                  p_hat + q*sin(phi_hat)*tan(theta_hat) + r_hat*cos(phi_hat)*tan(theta_hat);
-%                  1/Jy*tau_theta;
-%                  q*cos(phi_hat) - r*sin(phi_hat);
-%                  1/Jz*tau_psi;
-%                  q*sin(phi_hat)/cos(theta_hat) + r*cos(phi_hat)/cos(theta_hat)];
-    dx_hat_dt = A*x_hat + B*u_clipped + L*(y-x_hat);
+
+    %dx_hat_dt = A*x_hat + B*u_clipped + L*(y-x_hat);
+    dx_hat_dt = [cos(phi_hat)*sin(theta_hat)*az;
+                 px_dot_hat;
+                 -sin(phi_hat)*az;
+                 py_dot_hat;
+                 g + cos(phi_hat)*cos(theta_hat)*az;
+                 pz_dot_hat;
+                 1/Jx*tau_phi;
+                 p_hat + q*sin(phi_hat)*tan(theta_hat) + r_hat*cos(phi_hat)*tan(theta_hat);
+                 1/Jy*tau_theta;
+                 q*cos(phi_hat) - r*sin(phi_hat);
+                 1/Jz*tau_psi;
+                 q*sin(phi_hat)/cos(theta_hat) + r*cos(phi_hat)/cos(theta_hat)];
+    dx_hat_dt = dx_hat_dt + L*(y-x_hat);        
     dx_ext_dt = [dx_dt; dx_hat_dt];
 end
