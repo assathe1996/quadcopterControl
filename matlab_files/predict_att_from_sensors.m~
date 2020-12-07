@@ -38,16 +38,16 @@ ay = zeros(N,1);
 az = zeros(N,1);
 
 % lpf weights - closer to 1 means more weight given to newest measurement
-acc_lpf_weight = .95;
-imu_lpf_weight = .95;
-mag_lpf_weight = .95;
+acc_lpf_weight = .98;
+imu_lpf_weight = .98;
+mag_lpf_weight = .98;
 % complementary filter weights - closer to 1 means more weight given to
 % gyro data versus accelerometer/magnetometer
-accel_weight = 0.0001;
+accel_weight = 0.00001;
 gyro_weight = 1-accel_weight;
-mag_weight = .1;
+mag_weight = .01;
 gyro_weight_heading = 1-mag_weight;
-cf_use_filtered_data = true;
+cf_use_filtered_data = false;
 
 for i = 2:N
     % LPF the data where applicable

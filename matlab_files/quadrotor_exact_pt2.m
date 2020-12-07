@@ -22,7 +22,7 @@ function dx_ext_dt = quadrotor_exact(t, x_ext, K, L, sensor_noise, A, B)
     r =      x(11);
     psi =    x(12);
     
-    x_hat = x_ext(13:24);
+    x_hat = x;%x_ext(13:24);
     px_dot_hat = x_hat(1);
 %   px =     x(2);
     py_dot_hat = x_hat(3);
@@ -41,7 +41,7 @@ function dx_ext_dt = quadrotor_exact(t, x_ext, K, L, sensor_noise, A, B)
         y(i) = x(i) + normrnd(0,sensor_noise(i));
     end
     
-    u = -K*x_hat;
+    u = -K*y;
     u(1) = u(1) + m*g;
     
     u_clipped = zeros(4,1);
@@ -88,6 +88,6 @@ function dx_ext_dt = quadrotor_exact(t, x_ext, K, L, sensor_noise, A, B)
                  q*cos(phi_hat) - r*sin(phi_hat);
                  1/Jz*tau_psi;
                  q*sin(phi_hat)/cos(theta_hat) + r*cos(phi_hat)/cos(theta_hat)];
-    dx_hat_dt = dx_hat_dt + L*(y-x_hat);        
+    %dx_hat_dt = dx_hat_dt + L*(y-x_hat);        
     dx_ext_dt = [dx_dt; dx_hat_dt];
 end

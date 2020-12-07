@@ -1,0 +1,17 @@
+clear
+clc
+
+rng(2);
+run('quadrocopter_LQR.m')
+
+x0 = zeros(12,1);
+% run2 values (run 1 was 15, 15 15)
+px_init = -5; py_init = -5; pz_init = -5;
+x0(2) = px_init;
+x0(4) = py_init;
+x0(6) = pz_init;
+
+T_final = 10;
+
+sim_out = sim('quadrotor_model',(0:0.01:T_final));
+x = sim_out.yout{1}.Values.Data
