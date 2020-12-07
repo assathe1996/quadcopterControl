@@ -5,7 +5,10 @@ static float height_setpoint;
 static float x_setpoint;
 static float y_setpoint;
 static float yaw_setpoint;
-//static bool height_entered = false;
+//static std::vector<float> gyro_x_memory;
+
+static std::uint64_t previous_time;
+static Matrix<float, 12, 1> prev_x_hat_dot;
 
 LQRattControl::LQRattControl() :
 	ModuleParams(nullptr),
@@ -14,6 +17,8 @@ LQRattControl::LQRattControl() :
 		set_firmware_dir();
 		_equilibrium_state = get_state();
 		read_K();
+		read_A_L_C();
+		read_B();
 
 		show_height = false;
 		x_setpoint = _equilibrium_state(1, 0);
@@ -21,6 +26,13 @@ LQRattControl::LQRattControl() :
 		height_setpoint = _equilibrium_state(5, 0);
 		yaw_setpoint = _equilibrium_state(11, 0);
 		memset(&_actuators, 0, sizeof(_actuators));
+
+		previous_time = hrt_absolute_time();
+
+		for (int i = 0; i < 12; i++) {
+			_current_state(i, 0) = 0;
+			prev_x_hat_dot(i, 0) = 0;
+		}
 }
 
 LQRattControl::~LQRattControl() {
@@ -61,7 +73,7 @@ void LQRattControl::publish_acuator_controls() {
 		PX4_ERR("Actuator publish unsuccessful");
 }
 
-Matrix<float, 12, 1> LQRattControl::get_state() {
+Matrix<float, 12, 1> LQRattControl::get_ekf_state() {
 	poll_vechicle_local_position();
 	poll_vehicle_attitide();
 	poll_vehicle_angular_velocity();
@@ -101,23 +113,84 @@ void LQRattControl::set_firmware_dir() {
 }
 
 void LQRattControl::read_K() {
-	const unsigned SIZE = 12;
+	const unsigned ROW_SIZE = 4;
+	const unsigned COL_SIZE = 12;
 
 	static std::ifstream infile;
 	static std::string current_path = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/K.txt";
 	infile.open(current_path);
 
 	if (infile.is_open() == true) {
-		for (unsigned row = 0; row < SIZE; row++) {
+		for (unsigned row = 0; row < ROW_SIZE; row++) {
 			std::string line;
 			getline(infile, line);
 			std::stringstream this_stream(line);
-			for (unsigned column = 0 ; column < SIZE; column++) 
+			for (unsigned column = 0 ; column < COL_SIZE; column++) {
 				this_stream >> _K(row, column);
+			}
 		}
 		infile.close();
 	} else 
 		PX4_ERR("K.txt not opened");
+}
+
+void LQRattControl::read_A_L_C() {
+	const unsigned SIZE = 12;
+
+	static std::ifstream infile_A, infile_L, infile_C;
+	static std::string current_path_A = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/A.txt";
+	static std::string current_path_L = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/L.txt";
+	static std::string current_path_C = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/C.txt";
+
+	infile_A.open(current_path_A);
+	infile_L.open(current_path_L);
+	infile_C.open(current_path_C);
+
+	if (infile_A.is_open() == true && infile_L.is_open() == true && infile_C.is_open() == true) {
+		for (unsigned row = 0; row < SIZE; row++) {
+			std::string line_A, line_L, line_C;
+			getline(infile_A, line_A);
+			getline(infile_L, line_L);
+			getline(infile_C, line_C);
+
+			std::stringstream this_stream_A(line_A);
+			std::stringstream this_stream_L(line_L);
+			std::stringstream this_stream_C(line_C);
+
+			for (unsigned column = 0 ; column < SIZE; column++) {
+				this_stream_A >> _A(row, column);
+				this_stream_L >> _L(row, column);
+				this_stream_C >> _C(row, column);
+			}
+		}
+		infile_A.close();
+		infile_L.close();
+		infile_C.close();
+	} else 
+		PX4_ERR("A.txt or L.txt or C.txt not opened");	
+}
+
+void LQRattControl::read_B() {
+	const unsigned ROW_SIZE = 12;
+	const unsigned COL_SIZE = 4;
+
+	static std::ifstream infile;
+	static std::string current_path = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/B.txt";
+	infile.open(current_path);
+
+	if (infile.is_open() == true) {
+		for (unsigned row = 0; row < ROW_SIZE; row++) {
+			std::string line;
+			getline(infile, line);
+			std::stringstream this_stream(line);
+			for (unsigned column = 0 ; column < COL_SIZE; column++) {
+
+				this_stream >> _B(row, column);
+			}
+		}
+		infile.close();
+	} else 
+		PX4_ERR("B.txt not opened");	
 }
 
 void LQRattControl::write_state(Matrix <float, 12, 1> state) {
@@ -150,6 +223,10 @@ void LQRattControl::normalize() {
     _u_control(2,0) = fmin(fmax((_u_control(2,0)),  -1.0f), 1.0f);
     _u_control(3,0) = fmin(fmax((_u_control(3,0)), -1.0f), 1.0f);
     _u_control(0,0) = fmin(fmax((_u_control(0,0)), 0.0f), 1.0f) + 0.20f;
+    /*_u_control(1, 0) = fmin(fmax((_u_control(1, 0)) / (0.1080f * 4.0f), -1.0f), 1.0f) * 0.4f;
+    _u_control(2, 0) = fmin(fmax((_u_control(2, 0)) / (0.1080f * 4.0f), -1.0f), 1.0f) * 0.4f;
+    _u_control(3, 0) = fmin(fmax((_u_control(3, 0)) / (0.1f * 4.0f), -1.0f), 1.0f) * 0.4f;
+    _u_control(0, 0) = fmin(fmax((_u_control(0, 0) + 16.0f) / (16.0f), 0.0f), 1.0f);*/
 }
 
 void LQRattControl::display() {
@@ -193,8 +270,20 @@ Matrix<float, 12, 1> LQRattControl::complementary_filter() {
 	float mag_y = _sensor_mag.y / mag_length;
 	float mag_z = _sensor_mag.z / mag_length;
 
+	/*gyro_x_memory.push_back(_sensor_combined.gyro_rad[0]);
+	if (gyro_x_memory.size() >= 5) {
+		gyro_x_memory.erase(gyro_x_memory.begin());
+	} */
+
+	/*float gyro_lpf_weight = 0.9;
+	float p_lpf_x = (1.0f-gyro_lpf_weight)*estimated_state(6,0) + gyro_lpf_weight * _sensor_combined.gyro_rad[0];
+	float p_lpf_y = (1.0f-gyro_lpf_weight)*estimated_state(8,0) + gyro_lpf_weight * _sensor_combined.gyro_rad[1];
+	float p_lpf_z = (1.0f-gyro_lpf_weight)*estimated_state(10,0) + gyro_lpf_weight * _sensor_combined.gyro_rad[2];*/
+
+
 	estimated_state(6, 0) = _sensor_combined.gyro_rad[0];
 	estimated_state(7, 0) = gyro_weight * (estimated_state(7, 0) + estimated_state(6, 0) * time_diff_gyro) + accel_weight * roll_from_acc; 
+	
 	estimated_state(8, 0) = _sensor_combined.gyro_rad[1];
 	estimated_state(9, 0) = gyro_weight * (estimated_state(9, 0) + estimated_state(8, 0) * time_diff_gyro) + accel_weight * pitch_from_acc;
 
@@ -218,6 +307,17 @@ void LQRattControl::poll_sensor_mag() {
 	_sensor_mag_sub = orb_subscribe(ORB_ID(sensor_mag));
 	orb_copy(ORB_ID(sensor_mag), _sensor_mag_sub, &_sensor_mag);
 	orb_unsubscribe(_sensor_mag_sub);
+}
+
+float LQRattControl::calculate_rms(Matrix<float,12, 1> vector) {
+	float rms_value = 0;
+	const unsigned SIZE = 12;
+
+	for (unsigned i = 0; i < SIZE; i++) {
+		rms_value += (vector(i, 0) * vector(i, 0));
+	}
+	rms_value = sqrt(rms_value);
+	return rms_value;
 }
 
 // ModuleBase functions
@@ -329,8 +429,34 @@ void LQRattControl::Run() {
 	perf_begin(_loop_perf);
 
 	set_equilibrium_state();
-	_current_state = complementary_filter();
-	//_current_state = get_state();
+	_x_hat = complementary_filter();
+	_y = get_ekf_state();
+	_x_hat_dot = _A * _x_hat + (_B * _u_control) + _L * (_y -  _x_hat);
+
+	std::uint64_t time_diff = hrt_absolute_time() - previous_time;
+	if (time_diff > 0.0) {
+		_current_state += (_x_hat_dot - prev_x_hat_dot) * time_diff * 1e-6 ;
+		prev_x_hat_dot = _x_hat_dot;
+		previous_time = hrt_absolute_time();
+	}
+
+	PX4_INFO("RMS: %f", double(calculate_rms(_y - _current_state)));
+
+
+	//PX4_INFO("%f", double(calculate_rms(_x_hat - _current_state)));
+	//Matrix<float, 12, 1> diff = _x_hat - _current_state;
+	//PX4_INFO("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f", double(_current_state(0, 0)), double(_current_state(1, 0)), double(_current_state(2, 0)), double(_current_state(3, 0)), 
+	//	double(_current_state(4, 0)), double(_current_state(5, 0)), 
+	//	double(_current_state(6, 0)), double(_current_state(7, 0)), double(_current_state(8, 0)), double(_current_state(9, 0)), double(_current_state(10, 0)), double(_current_state(11, 0)));
+	//_current_state = _x_hat;
+	//PX4_INFO("%f", double(calculate_rms(_x_hat - _current_state)));
+	//PX4_INFO("%f %f", double(_current_state(5, 0)), double(_x_hat(5, 0)));
+	//_current_state = _x_hat;
+
+	//PX4_INFO("%f %f", double(_x_hat(0, 0)), double(_current_state(0, 0)));
+	
+
+
 
 	compute();
 	normalize();

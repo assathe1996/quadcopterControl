@@ -24,6 +24,8 @@
 #include <iostream>
 #include <sstream>
 #include <math.h>
+#include <vector>
+#include <numeric>
 
 using namespace matrix;
 using namespace time_literals;
@@ -63,6 +65,14 @@ private:
 	Matrix<float, 4, 1> _u_control;
 	Matrix<float, 4, 12> _K;
 
+	Matrix<float, 12, 12> _A;
+	Matrix<float, 12, 12> _L;
+	Matrix<float, 12, 12> _C;
+	Matrix<float, 12, 4> _B;
+	Matrix<float, 12, 1> _x_hat;
+	Matrix<float, 12, 1> _x_hat_dot;
+	Matrix<float, 12, 1> _y;
+
 	std::string firmware_dir;
 	perf_counter_t	_loop_perf;
 
@@ -72,10 +82,12 @@ private:
 
 	void publish_acuator_controls();
 
-	Matrix<float, 12, 1> get_state();
+	Matrix<float, 12, 1> get_ekf_state();
 	void set_equilibrium_state();
 	void set_firmware_dir();
 	void read_K();
+	void read_A_L_C();
+	void read_B();
 	void write_state(Matrix <float, 12, 1> state);
 
 	void compute();
@@ -86,6 +98,7 @@ private:
 	Matrix<float, 12, 1> complementary_filter();
 	void poll_sensor_combined();
 	void poll_sensor_mag();
+	float calculate_rms(Matrix<float,12, 1> vector);
 
 	int _sensor_combined_sub{-1};
 	int _sensor_mag_sub{-1};
