@@ -28,6 +28,8 @@ LQRattControl::LQRattControl() :
 		memset(&_actuators, 0, sizeof(_actuators));
 
 		previous_time = hrt_absolute_time();
+		_x_hat = complementary_filter();
+		_y = get_ekf_state();
 
 		for (int i = 0; i < 12; i++) {
 			_current_state(i, 0) = 0;
@@ -222,7 +224,7 @@ void LQRattControl::normalize() {
     _u_control(1,0) = fmin(fmax((_u_control(1,0)), -1.0f), 1.0f);  
     _u_control(2,0) = fmin(fmax((_u_control(2,0)),  -1.0f), 1.0f);
     _u_control(3,0) = fmin(fmax((_u_control(3,0)), -1.0f), 1.0f);
-    _u_control(0,0) = fmin(fmax((_u_control(0,0)), 0.0f), 1.0f) + 0.20f;
+    _u_control(0,0) = fmin(fmax((_u_control(0,0)), 0.0f), 1.0f) + 0.30f;
     /*_u_control(1, 0) = fmin(fmax((_u_control(1, 0)) / (0.1080f * 4.0f), -1.0f), 1.0f) * 0.4f;
     _u_control(2, 0) = fmin(fmax((_u_control(2, 0)) / (0.1080f * 4.0f), -1.0f), 1.0f) * 0.4f;
     _u_control(3, 0) = fmin(fmax((_u_control(3, 0)) / (0.1f * 4.0f), -1.0f), 1.0f) * 0.4f;
@@ -427,9 +429,38 @@ void LQRattControl::Run() {
 	}
 
 	perf_begin(_loop_perf);
-
 	set_equilibrium_state();
-	_x_hat = complementary_filter();
+
+	_x_hat_dot = _A * _x_hat + (_B * _u_control) + _L * (_y -  _x_hat);
+
+	std::uint64_t time_diff = hrt_absolute_time() - previous_time;
+	if (time_diff > 0.0) {
+		_current_state += (_x_hat_dot) * time_diff * 1e-6 ;
+		previous_time = hrt_absolute_time();
+		_x_hat = complementary_filter();
+		_y = get_ekf_state();
+	}
+	PX4_INFO("%f", double(calculate_rms(_y - _current_state)));
+
+	//SquareMatrix<float, 12> A_inv;
+	//A_inv = inv(_A);
+
+	/*_y = get_ekf_state();
+	std::uint64_t time_diff = hrt_absolute_time() - previous_time;
+
+	if (time_diff > 0) {
+		_x_hat = (_A - _L) * (_B * _u_control + _L * _y) * time_diff * 1e-6;
+		previous_time = hrt_absolute_time();
+		for(int i = 0; i < 12; i++)
+			_x_hat(i, 0) = pow(2.71828, _x_hat(i, 0));
+		_x_hat(5, 0) /= 330132302889095580172156928.0f;
+	}
+	_current_state = _y;
+	
+	Matrix<float, 12, 1> diff = _y - _x_hat;*/
+	//PX4_INFO("RMS: %f", double(calculate_rms(_y - _current_state)));
+
+	/*_x_hat = complementary_filter();
 	_y = get_ekf_state();
 	_x_hat_dot = _A * _x_hat + (_B * _u_control) + _L * (_y -  _x_hat);
 
@@ -440,14 +471,14 @@ void LQRattControl::Run() {
 		previous_time = hrt_absolute_time();
 	}
 
-	PX4_INFO("RMS: %f", double(calculate_rms(_y - _current_state)));
+	PX4_INFO("RMS: %f", double(calculate_rms(_y - _current_state)));*/
 
 
 	//PX4_INFO("%f", double(calculate_rms(_x_hat - _current_state)));
 	//Matrix<float, 12, 1> diff = _x_hat - _current_state;
-	//PX4_INFO("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f", double(_current_state(0, 0)), double(_current_state(1, 0)), double(_current_state(2, 0)), double(_current_state(3, 0)), 
-	//	double(_current_state(4, 0)), double(_current_state(5, 0)), 
-	//	double(_current_state(6, 0)), double(_current_state(7, 0)), double(_current_state(8, 0)), double(_current_state(9, 0)), double(_current_state(10, 0)), double(_current_state(11, 0)));
+	//PX4_INFO("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f", double(diff(0, 0)), double(diff(1, 0)), double(diff(2, 0)), double(diff(3, 0)), 
+	//	double(diff(4, 0)), double(diff(5, 0)), 
+	//	double(diff(6, 0)), double(diff(7, 0)), double(diff(8, 0)), double(diff(9, 0)), double(diff(10, 0)), double(diff(11, 0)));
 	//_current_state = _x_hat;
 	//PX4_INFO("%f", double(calculate_rms(_x_hat - _current_state)));
 	//PX4_INFO("%f %f", double(_current_state(5, 0)), double(_x_hat(5, 0)));
