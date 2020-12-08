@@ -40,10 +40,10 @@ az = zeros(N,1);
 % lpf weights - closer to 1 means more weight given to newest measurement
 acc_lpf_weight = .98;
 imu_lpf_weight = .98;
-mag_lpf_weight = .98;
+mag_lpf_weight = 1;
 % complementary filter weights - closer to 1 means more weight given to
 % gyro data versus accelerometer/magnetometer
-accel_weight = 0.001;
+accel_weight = 0.0001;
 gyro_weight = 1-accel_weight;
 mag_weight = .01;
 gyro_weight_heading = 1-mag_weight;
@@ -128,17 +128,17 @@ title('\psi')
 
 figure()
 subplot(3,1,1)
-plot(t_true, (phi_true-phi_hat)*180/pi);
+plot(t_true, (phi_hat-phi_true)*180/pi);
 grid on
 ylabel('degrees º')
 title('\phi error')
 subplot(3,1,2)
-plot(t_true, (th_true-th_hat)*180/pi);
+plot(t_true, (th_hat-th_true)*180/pi);
 ylabel('degrees º')
 grid on
 title('\theta error')
 subplot(3,1,3)
-plot(t_true, (psi_true-psi_hat)*180/pi);
+plot(t_true, (psi_hat-psi_true)*180/pi);
 ylabel('degrees º')
 grid on
 title('\psi error')
