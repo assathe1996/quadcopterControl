@@ -282,6 +282,34 @@ void Observer::write_state(Matrix <float, 12, 1> state, std::string filename) {
 	outfile.close();
 }
 
+void Observer::write_two_states(Matrix <float, 12, 1> state1, std::string filename1, Matrix <float, 12, 1> state2, std::string filename2) {
+	const unsigned SIZE = 12;
+	hrt_abstime now = hrt_absolute_time();
+
+	static std::ofstream outfile1, outfile2;
+	static std::string current_path1 = firmware_dir + "Firmware/src/modules/observer/outputs/" + filename1 + ".txt";
+	static std::string current_path2 = firmware_dir + "Firmware/src/modules/observer/outputs/" + filename2 + ".txt";
+	outfile1.open(current_path1, std::ios::out | std::ios::app);
+	outfile2.open(current_path2, std::ios::out | std::ios::app);
+
+	outfile1 << now << "\t";
+	outfile2 << now << "\t";
+	for (unsigned count = 0; count < SIZE; count++) {
+		if (count == 11) {
+			outfile1 << state1(count, 0) << "\t";
+			outfile1 << calculate_rms(state1) << "\n";
+
+			outfile2 << state2(count, 0) << "\t";
+			outfile2 << calculate_rms(state2) << "\n";
+		}
+		else
+			outfile1 << state1(count, 0) << "\t";
+			outfile2 << state2(count, 0) << "\t";
+	}
+	outfile1.close();
+	outfile2.close();
+}
+
 void Observer::write_magnetometer_vals() {
 	static std::ofstream outfile;
 	static std::string current_path = firmware_dir + "Firmware/src/modules/observer/outputs/" + "mag_val" + ".txt";
@@ -461,14 +489,16 @@ void Observer::Run() {
 	std::uint64_t time_diff = hrt_absolute_time() - previous_time;
 	if (time_diff > 0.0) {
 		_current_state += (_x_hat_dot) * time_diff * 1e-6 ;
+		//write_state(_current_state, "linear_observer");
 		previous_time = hrt_absolute_time();
 	}
 
 	compute();
 	normalize();
+
 	
-	write_state(_current_state, "linear_observer");
-	write_state(_y, "ground_truth");
+	//write_state(_y, "ground_truth");
+	write_two_states(_y, "ground_truth", _current_state, "linear_observer");
 
 
 	perf_end(_loop_perf);

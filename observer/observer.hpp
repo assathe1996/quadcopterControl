@@ -123,5 +123,7 @@ private:
 	void compute();
 	void normalize();
 
+	void write_two_states(Matrix <float, 12, 1> state1, std::string filename1, Matrix <float, 12, 1> state2, std::string filenam2);
+
 };
 
