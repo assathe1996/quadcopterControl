@@ -27,6 +27,8 @@
 #include <iostream>
 #include <sstream>
 #include <math.h>
+#include <vector>
+#include <numeric>
 
 using namespace matrix;
 using namespace time_literals;
@@ -67,7 +69,17 @@ private:
 	std::string firmware_dir;
 
 	Matrix<float, 12, 1> _current_state;
-	Matrix<float, 12, 1> _estimated_state;
+	Matrix<float, 12, 1> _equilibrium_state;
+	Matrix<float, 4, 1> _u_control;
+
+	Matrix<float, 4, 12> _K;
+	Matrix<float, 12, 12> _A;
+	Matrix<float, 12, 12> _L;
+	Matrix<float, 12, 12> _C;
+	Matrix<float, 12, 4> _B;
+	Matrix<float, 12, 1> _x_hat;
+	Matrix<float, 12, 1> _x_hat_dot;
+	Matrix<float, 12, 1> _y;
 
 	struct actuator_controls_s			_actuators {};
 	struct sensor_combined_s            _sensor_combined {};
@@ -95,10 +107,21 @@ private:
 
 	void set_firmware_dir();
 
-	Matrix<float, 12, 1> get_state();
-	Matrix<float,12, 1> integrator_estimator();
+	Matrix<float, 12, 1> get_ekf_state();
+	Matrix<float, 12, 1> integrator_estimator();
+	Matrix<float, 12, 1> complementary_filter();
 
 	float calculate_rms(Matrix<float,12, 1> vector);
+
+	void write_state(Matrix <float, 12, 1> state, std::string filename);
+	void write_magnetometer_vals();
+
+	void read_K();
+	void read_A_L_C();
+	void read_B();
+
+	void compute();
+	void normalize();
 
 };
 
