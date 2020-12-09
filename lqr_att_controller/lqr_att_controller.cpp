@@ -299,6 +299,45 @@ Matrix<float, 12, 1> LQRattControl::complementary_filter() {
 	return estimated_state;
 }
 
+Matrix<float, 12, 1> LQRattControl::calc_nonlinear_dynamics(Matrix<float, 12, 1> x, Matrix<float, 4, 1> u) {
+	static Matrix<float, 12, 1> dx_dt;
+	float m = 0.6;
+    float Jx = 0.0092;
+    float Jy = 0.0091;
+    float Jz = 0.0101;
+    float g = 9.81;
+
+    float px_dot = x(0,0);
+    float py_dot = x(0,2);
+    float pz_dot = x(0,4);
+    float p =      x(0,6);
+    float phi =    x(0,7);
+    float q =      x(0,8); 
+    float theta =  x(0,9);
+    float r =      x(0,10);
+
+    float F = u(0,0);
+    float tau_phi = u(1,0);
+    float tau_theta = u(2,0);
+    float tau_psi = u(3,0);
+    float az = -F/m;
+
+    dx_dt(0,0) = cos(phi)*sin(theta)*az;
+    dx_dt(1,0) = px_dot;
+    dx_dt(2,0) = -sin(phi)*az;
+    dx_dt(3,0) = py_dot;
+    dx_dt(4,0) = g + cos(phi)*cos(theta)*az;
+    dx_dt(5,0) = pz_dot;  
+    dx_dt(6,0) = 1/Jx*tau_phi;
+    dx_dt(7,0) = p + q*sin(phi)*tan(theta) + r*cos(phi)*tan(theta);
+    dx_dt(8,0) = 1/Jy*tau_theta;
+    dx_dt(9,0) = q*cos(phi) - r*sin(phi);
+    dx_dt(10,0) = 1/Jz*tau_psi;
+    dx_dt(11,0) = q*sin(phi)/cos(theta) + r*cos(phi)/cos(theta);
+
+	return dx_dt;
+}
+
 void LQRattControl::poll_sensor_combined() {
 	_sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
 	orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensor_combined);
@@ -432,7 +471,8 @@ void LQRattControl::Run() {
 	set_equilibrium_state();
 
 	_y = get_ekf_state();
-	_x_hat_dot = _A * _current_state + _B * (_u_control) +  _L * (_y -  _current_state);
+	_x_hat_dot = calc_nonlinear_dynamics(_current_state, _u_control) +  _L * (_y -  _current_state);
+	//_x_hat_dot = _A * _current_state + _B * (_u_control) +  _L * (_y -  _current_state);
 
 	std::uint64_t time_diff = hrt_absolute_time() - previous_time;
 	if (time_diff > 0.0) {

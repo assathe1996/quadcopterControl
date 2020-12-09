@@ -72,6 +72,7 @@ private:
 	Matrix<float, 12, 1> _x_hat;
 	Matrix<float, 12, 1> _x_hat_dot;
 	Matrix<float, 12, 1> _y;
+	Matrix<float, 12, 1> LQRattControl::calc_nonlinear_dynamics(Matrix<float, 12, 1> x, Matrix<float, 4, 1> u);
 
 	std::string firmware_dir;
 	perf_counter_t	_loop_perf;
