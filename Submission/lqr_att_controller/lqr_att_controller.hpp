@@ -76,6 +76,7 @@ private:
 	Matrix<float, 12, 1> _x_hat;
 	Matrix<float, 12, 1> _x_hat_dot;
 	Matrix<float, 12, 1> _y;
+	Matrix<float, 9, 1> _y_reduced; // y measurements if we do not use positional velocity 
 	
 	/* System constants */
 	Matrix<float, 12, 12> _A;
@@ -83,6 +84,9 @@ private:
 	Matrix<float, 12, 12> _C;
 	Matrix<float, 12, 12> _L;
 	Matrix<float, 4, 12> _K;
+	Matrix<float, 9, 12> _C_reduced; // C for if we do not use the velocity measurements
+	Matrix<float, 12, 9> _L_reduced; // L for if we do not use the velocity measurements
+	
 	
 	/* Noise injection parameters */
 	std::default_random_engine generator;
@@ -107,17 +111,20 @@ private:
 	void set_firmware_dir();
 	void read_K();
 	void read_A_L_C();
+	void read_L_C_reduced();
 	void read_B();
 	void write_state(Matrix <float, 12, 1> state, std::string filename);
+
 	
 	/* State variable computation functions */
 	Matrix<float, 12, 1> get_ekf_state();
 	Matrix<float, 12, 1> complementary_filter();
 	Matrix<float, 12, 1> get_noise();
+	Matrix<float, 9, 1> get_reduced_state();
 	void set_equilibrium_state();
 	float calculate_rms(Matrix<float,12, 1> vector);
 	Matrix<float, 12, 1> calc_nonlinear_dynamics(Matrix<float, 12, 1> x, Matrix<float, 4, 1> u);
-	
+
 	/* Control input computation functions */
 	void compute();
 	void normalize();

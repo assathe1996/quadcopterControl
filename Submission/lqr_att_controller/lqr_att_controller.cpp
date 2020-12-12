@@ -18,6 +18,7 @@ LQRattControl::LQRattControl() :
 		_equilibrium_state = get_ekf_state();
 		read_K();
 		read_A_L_C();
+		read_L_C_reduced();
 		read_B();
 
 		show_height = false;
@@ -30,7 +31,8 @@ LQRattControl::LQRattControl() :
 		previous_time = hrt_absolute_time();
 		start_time = hrt_absolute_time();
 		_x_hat = complementary_filter();
-		_y = get_ekf_state();
+		// _y = get_ekf_state();
+		_y = complementary_filter();
 
 		for (int i = 0; i < 12; i++) {
 			_current_state(i, 0) = 0;
@@ -156,13 +158,18 @@ void LQRattControl::Run() {
 	_x_hat_dot = _A * _current_state + _B * (_u_control) +  _L * (_y -  _current_state);
 	//_x_hat_dot = calc_nonlinear_dynamics(_current_state, _u_control) + _L * (_y -  _current_state);
 
+	/* Make observer estimate positional velocities -- NOT YET STABLE! */ 
+	//_x_hat_dot = _A * _current_state + _B * (_u_control) +  _L_reduced * (_y_reduced -  _C_reduced*_current_state);
+	//_x_hat_dot = calc_nonlinear_dynamics(_current_state, _u_control) + _L_reduced * (_y_reduced -  _C_reduced*_current_state);
+
 	/* Estimate current x_hat from x_hat_dot */
 	std::uint64_t time_diff = hrt_absolute_time() - previous_time;
 	if (time_diff > 0.0) {
 		_current_state += (_x_hat_dot) * time_diff * 1e-6 ;
 		previous_time = hrt_absolute_time();
 	}
-	
+
+
 	/* Maneuver 1: Travels from origin to (5 ,5 ,5) */
 	/*if (hrt_absolute_time() - start_time >= 5 * 1e6) {
 		_equilibrium_state(5, 0) = -5;
@@ -199,8 +206,9 @@ void LQRattControl::Run() {
 	publish_acuator_controls();
 
 	/* Update the observed state by EKF or complementary filter */
-	_y = get_ekf_state() + get_noise();
-	//_y = complementary_filter();
+	//_y = get_ekf_state() + get_noise();
+	_y = complementary_filter();
+	_y_reduced = get_reduced_state();
 	
 	perf_end(_loop_perf);
 }
@@ -288,6 +296,7 @@ void LQRattControl::read_A_L_C() {
 	static std::string current_path_A = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/A.txt";
 	static std::string current_path_L = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/L.txt";
 	static std::string current_path_C = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/C.txt";
+	
 
 	infile_A.open(current_path_A);
 	infile_L.open(current_path_L);
@@ -315,6 +324,46 @@ void LQRattControl::read_A_L_C() {
 		infile_C.close();
 	} else 
 		PX4_ERR("A.txt or L.txt or C.txt not opened");	
+}
+
+void LQRattControl::read_L_C_reduced() {
+
+	static std::ifstream infile_L, infile_C;
+	static std::string current_path_L = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/L_reduced.txt";
+	static std::string current_path_C = firmware_dir + "Firmware/src/modules/lqr_att_controller/model_params/C_reduced.txt";
+
+	infile_L.open(current_path_L);
+	infile_C.open(current_path_C);
+
+	if (infile_L.is_open() == true) {
+		for (unsigned row = 0; row < 12; row++) {
+			std::string line_L;
+			getline(infile_L, line_L);
+
+			std::stringstream this_stream_L(line_L);
+
+			for (unsigned column = 0 ; column < 9; column++) {
+				this_stream_L >> _L_reduced(row, column);
+			}
+		}
+		infile_L.close();
+	} else 
+		PX4_ERR("L_reduced.txt not opened");
+
+	if (infile_C.is_open() == true) {
+		for (unsigned row = 0; row < 9; row++) {
+			std::string line_C;
+			getline(infile_C, line_C);
+
+			std::stringstream this_stream_C(line_C);
+
+			for (unsigned column = 0 ; column < 12; column++) {
+				this_stream_C >> _C_reduced(row, column);
+			}
+		}
+		infile_L.close();
+	} else 
+		PX4_ERR("C_reduced.txt not opened");	
 }
 
 void LQRattControl::read_B() {
@@ -386,14 +435,37 @@ Matrix<float, 12, 1> LQRattControl::get_ekf_state() {
 	return state;
 }
 
+/* State variable computation functions */
+Matrix<float, 9, 1> LQRattControl::get_reduced_state() {
+	poll_vechicle_local_position();
+	poll_vehicle_attitide();
+	poll_vehicle_angular_velocity();
+
+	static Matrix<float, 9, 1> state;
+
+	state(1, 0) = _vehicle_pos.x;
+	state(2, 0) = _vehicle_pos.y;
+	state(3, 0) = _vehicle_pos.z;
+
+	state(4, 0) = _vehicle_angular_velocity.xyz[0];
+	state(5, 0) =  Eulerf(Quatf(_vehicle_attitude.q)).phi();
+	state(6, 0) = _vehicle_angular_velocity.xyz[1];
+	state(7, 0) =  Eulerf(Quatf(_vehicle_attitude.q)).theta();
+	state(8, 0) = _vehicle_angular_velocity.xyz[2];
+	state(9, 0) =  Eulerf(Quatf(_vehicle_attitude.q)).psi();
+
+	return state;
+}
+
 Matrix<float, 12, 1> LQRattControl::complementary_filter() {
 	poll_sensor_combined();
 	poll_sensor_mag();
 	poll_vechicle_local_position();
 	poll_vehicle_angular_velocity();
 
-	const float gyro_weight = 0.98f;
-	const float accel_weight = 0.02f;
+	const float gyro_weight = 0.999f;
+	const float accel_weight = 0.001f;
+	const float mag_weight = 0.01f;
 
 	static Matrix<float, 12, 1> estimated_state;
 	const float us_to_s = 0.000001;
@@ -414,7 +486,7 @@ Matrix<float, 12, 1> LQRattControl::complementary_filter() {
 	float mag_y = _sensor_mag.y / mag_length;
 	float mag_z = _sensor_mag.z / mag_length;
 
-	float gyro_lpf_weight = 0.5;
+	float gyro_lpf_weight = 0.98f;
 	float p_lpf_x = (1.0f-gyro_lpf_weight)*estimated_state(6,0) + gyro_lpf_weight * _sensor_combined.gyro_rad[0];
 	float p_lpf_y = (1.0f-gyro_lpf_weight)*estimated_state(8,0) + gyro_lpf_weight * _sensor_combined.gyro_rad[1];
 	float p_lpf_z = (1.0f-gyro_lpf_weight)*estimated_state(10,0) + gyro_lpf_weight * _sensor_combined.gyro_rad[2];
@@ -429,8 +501,7 @@ Matrix<float, 12, 1> LQRattControl::complementary_filter() {
 	float yaw_from_mag = atan2(numerator, denominator);
 
 	estimated_state(6, 0) = p_lpf_z;
-	estimated_state(11, 0) = gyro_weight * (estimated_state(11, 0) + estimated_state(10, 0) * time_diff_gyro) + accel_weight * yaw_from_mag;
-
+	estimated_state(11, 0) = (1.0f-mag_weight) * (estimated_state(11, 0) + estimated_state(10, 0) * time_diff_gyro) + mag_weight * yaw_from_mag;
 	
 	return estimated_state;
 }
