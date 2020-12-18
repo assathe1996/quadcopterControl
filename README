@@ -32,7 +32,7 @@ For Maneuver 1: Uncomment lines 167 - 172 in lqr_att_controller.cpp
 For Maneuver 2: Uncomment lines 176 - 188 in lqr_att_controller.cpp
 
 ## Non Linear Predictor
-To enable non linear predictor uncomment line 157 lqr_att_controller.cpp 
+To enable non linear predictor uncomment line 157 lqr_att_controller.cpp
 
 ## Complementary filter
 To enable complementry filter uncomment line 203 lqr_att_controller.cpp
